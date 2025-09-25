@@ -33,6 +33,7 @@ sessions: Dict[str, WebSocket] = {}
 questions_by_session: Dict[str, List[Dict[str, Any]]] = {}
 answers_by_session: Dict[str, Dict[str, Any]] = {}
 workflow_by_session: Dict[str, Dict[str, Any]] = {}
+session_states: Dict[str, Dict[str, Any]] = {}
 
 
 async def send_event(session_id: str, event: Dict[str, Any]) -> None:
@@ -50,9 +51,19 @@ async def send_event(session_id: str, event: Dict[str, Any]) -> None:
 
 
 async def orchestrate_disclosure_review(session_id: str, tenant_id: str, query: str = "revenue") -> None:
+    state = session_states.setdefault(session_id, {"stage": "idle", "paused": False, "cancelled": False, "weights": {}})
     await send_event(session_id, {"type": "agent.status", "status": "running", "task": "disclosure_review", "agent": "orchestrator"})
+    state.update({"stage": "ingestion"})
     await run_ingestion_agent(send_event, session_id, tenant_id)
+    if state.get("cancelled"):
+        await send_event(session_id, {"type": "agent.status", "status": "cancelled", "task": "disclosure_review", "agent": "orchestrator"})
+        return
+    state.update({"stage": "context"})
     ctx = await run_context_agent(send_event, session_id, tenant_id, query=query)
+    if state.get("cancelled"):
+        await send_event(session_id, {"type": "agent.status", "status": "cancelled", "task": "disclosure_review", "agent": "orchestrator"})
+        return
+    state.update({"stage": "qa"})
     qlist = await run_qa_agent(send_event, session_id, ctx.get("rows", []))
     questions_by_session[session_id] = qlist
 
@@ -183,6 +194,21 @@ async def events(ws: WebSocket):
                 tenant = data.get("tenantId", "tenant_demo")
                 if task == "disclosure_review":
                     asyncio.create_task(orchestrate_disclosure_review(session_id, tenant_id=tenant, query=data.get("query", "revenue")))
+            elif event_type in ("interrupt.pause", "agent.pause"):
+                st = session_states.setdefault(session_id, {"stage": "idle", "paused": False, "cancelled": False, "weights": {}})
+                st["paused"] = True
+                await send_event(session_id, {"type": "agent.status", "status": "paused", "task": st.get("stage"), "agent": "orchestrator", "reason": "user_interrupt"})
+            elif event_type in ("interrupt.resume", "agent.resume"):
+                st = session_states.setdefault(session_id, {"stage": "idle", "paused": False, "cancelled": False, "weights": {}})
+                st["paused"] = False
+                await send_event(session_id, {"type": "agent.status", "status": "running", "task": st.get("stage"), "agent": "orchestrator"})
+                # If currently in QA stage, attempt to build workflow now
+                if st.get("stage") == "qa":
+                    await maybe_emit_workflow(session_id)
+            elif event_type in ("agent.cancel", "interrupt.cancel"):
+                st = session_states.setdefault(session_id, {"stage": "idle", "paused": False, "cancelled": False, "weights": {}})
+                st["cancelled"] = True
+                await send_event(session_id, {"type": "agent.status", "status": "cancelled", "task": st.get("stage"), "agent": "orchestrator"})
             elif event_type == "widget.patch":
                 # apply minimal patch to workflow widgets
                 wf = workflow_by_session.get(session_id)
@@ -192,6 +218,25 @@ async def events(ws: WebSocket):
                         if w.get("id") == patch.get("id"):
                             w.update(patch.get("changes", {}))
                     await send_event(session_id, {"type": "workflow.update", "workflow": wf})
+            elif event_type == "user.answer":
+                # Accept answers via WS (AG-UI style)
+                qid = data.get("questionId")
+                answer_text = data.get("answer")
+                if qid and answer_text is not None:
+                    qs = questions_by_session.get(session_id) or []
+                    q_meta = next((q for q in qs if q.get("id") == qid), None)
+                    if session_id not in answers_by_session:
+                        answers_by_session[session_id] = {}
+                    answers_by_session[session_id][qid] = {
+                        "answer": answer_text,
+                        "required": bool(q_meta and q_meta.get("required")),
+                        "category": q_meta.get("category") if q_meta else None,
+                    }
+                    await send_event(session_id, {"type": "question.answered", "questionId": qid})
+            elif event_type == "context.weights.update":
+                st = session_states.setdefault(session_id, {"stage": "idle", "paused": False, "cancelled": False, "weights": {}})
+                st["weights"] = data.get("weights", {})
+                await send_event(session_id, {"type": "context.plan", "agent": "context", "weights": st["weights"]})
             elif event_type == "knowledge.add_source":
                 # Persist a source and its naive chunks
                 tenant = data.get("tenantId", "tenant_demo")

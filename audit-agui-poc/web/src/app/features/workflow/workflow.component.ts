@@ -12,6 +12,12 @@ import { AguiService } from '../../core/agui.service';
       <h3>Workflow</h3>
       <button (click)="refresh()">Refresh</button>
       <pre *ngIf="workflow">{{workflow | json}}</pre>
+      <div *ngIf="metrics">
+        <h4>Token Usage (estimate)</h4>
+        <div>AG-UI prompt: {{metrics.agui.prompt}} | output: {{metrics.agui.output}}</div>
+        <div>Baseline prompt: {{metrics.baseline.prompt}} | output: {{metrics.baseline.output}}</div>
+        <div>Prompt savings: {{metrics.baseline.prompt - metrics.agui.prompt}}</div>
+      </div>
       <div *ngIf="widget() as w">
         <h4>{{w.title}}</h4>
         <label>
@@ -25,6 +31,7 @@ import { AguiService } from '../../core/agui.service';
 })
 export class WorkflowComponent {
   workflow: any;
+  metrics: any;
 
   constructor(private agui: AguiService) {
     this.agui.on<any>('workflow.create').subscribe(e => {
@@ -32,6 +39,9 @@ export class WorkflowComponent {
     });
     this.agui.on<any>('workflow.update').subscribe(e => {
       this.workflow = e.workflow;
+    });
+    this.agui.on<any>('metrics.usage').subscribe(e => {
+      this.metrics = { agui: e.agui, baseline: e.baseline };
     });
   }
 

@@ -9,7 +9,7 @@ from fastapi import BackgroundTasks
 from fastapi import HTTPException
 from fastapi import APIRouter
 from pathlib import Path
-from .db import init_db, persist_event, upsert_source, insert_chunks, simple_retrieve, create_context_pack, save_questions, save_answer, save_workflow
+from .db import init_db, persist_event, upsert_source, insert_chunks, simple_retrieve, create_context_pack, save_questions, save_answer, save_workflow, save_usage_metrics
 from .agents import run_ingestion_agent, run_context_agent, run_qa_agent
 
 app = FastAPI(title="Audit AG-UI POC")
@@ -107,6 +107,23 @@ async def maybe_emit_workflow(session_id: str) -> None:
     workflow_by_session[session_id] = workflow
     save_workflow(session_id, workflow["id"], workflow)
     await send_event(session_id, {"type": "workflow.create", "workflow": workflow})
+    # naive usage estimation: AG-UI packs keep prompts short; baseline assumes raw doc prompt
+    # For demo purposes, estimate tokens by text lengths
+    qs = questions_by_session.get(session_id) or []
+    answers = answers_by_session.get(session_id) or {}
+    num_q = len(qs)
+    num_ans = len(answers)
+    agui_prompt_tokens = max(50, num_q * 20)  # compact prompts per question
+    agui_output_tokens = max(100, num_ans * 30)
+    baseline_prompt_tokens = max(500, num_q * 150)  # long raw-doc prompts
+    baseline_output_tokens = agui_output_tokens  # similar answers length
+    save_usage_metrics(session_id, agui_prompt_tokens, agui_output_tokens, baseline_prompt_tokens, baseline_output_tokens)
+    await send_event(session_id, {
+        "type": "metrics.usage",
+        "sessionId": session_id,
+        "agui": {"prompt": agui_prompt_tokens, "output": agui_output_tokens},
+        "baseline": {"prompt": baseline_prompt_tokens, "output": baseline_output_tokens}
+    })
 
 
 @router.post("/sessions")

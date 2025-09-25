@@ -74,6 +74,14 @@ def init_db() -> None:
               workflow_json TEXT,
               created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS usage_metrics (
+              session_id TEXT PRIMARY KEY,
+              tokens_agui_prompt REAL,
+              tokens_agui_output REAL,
+              tokens_baseline_prompt REAL,
+              tokens_baseline_output REAL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         conn.commit()
@@ -166,6 +174,15 @@ def save_workflow(session_id: str, workflow_id: str, workflow: Dict[str, Any]) -
         conn.execute(
             "INSERT OR REPLACE INTO workflows (id, session_id, workflow_json) VALUES (?, ?, ?)",
             (workflow_id, session_id, json.dumps(workflow)),
+        )
+        conn.commit()
+
+
+def save_usage_metrics(session_id: str, tokens_agui_prompt: float, tokens_agui_output: float, tokens_baseline_prompt: float, tokens_baseline_output: float) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO usage_metrics (session_id, tokens_agui_prompt, tokens_agui_output, tokens_baseline_prompt, tokens_baseline_output) VALUES (?, ?, ?, ?, ?)",
+            (session_id, tokens_agui_prompt, tokens_agui_output, tokens_baseline_prompt, tokens_baseline_output),
         )
         conn.commit()
 

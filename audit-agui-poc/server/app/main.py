@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from fastapi import APIRouter
 from pathlib import Path
 from .db import init_db, persist_event, upsert_source, insert_chunks, simple_retrieve, create_context_pack, save_questions, save_answer, save_workflow
+from .agents import run_ingestion_agent, run_context_agent, run_qa_agent
 
 app = FastAPI(title="Audit AG-UI POC")
 app.add_middleware(
@@ -49,34 +50,11 @@ async def send_event(session_id: str, event: Dict[str, Any]) -> None:
 
 
 async def orchestrate_disclosure_review(session_id: str, tenant_id: str, query: str = "revenue") -> None:
-    await send_event(session_id, {"type": "agent.status", "status": "running", "task": "disclosure_review"})
-    # Build context pack from both enterprise and customer kinds
-    rows = simple_retrieve(tenant_id=tenant_id, query=query, kinds=["enterprise", "customer"], top_k=20)
-    pack_id = f"ctx_{uuid.uuid4().hex[:8]}"
-    items = [(r["id"], 1.0) for r in rows]
-    create_context_pack(pack_id, tenant_id, task="disclosure_review", filters={"query": query}, items=items)
-    await send_event(session_id, {"type": "context.pack.created", "packId": pack_id, "size": len(items)})
-
-    # Generate minimal questions based on presence of certain keywords
-    qlist: List[Dict[str, Any]] = []
-    def mkq(txt: str, cat: str, req: bool = True) -> Dict[str, Any]:
-        return {"id": f"q_{uuid.uuid4().hex[:8]}", "text": txt, "citations": [], "required": req, "category": cat}
-
-    text_join = " ".join([r["text"] for r in rows])
-    if "revenue" in text_join.lower():
-        qlist.append(mkq("Confirm revenue disaggregation by category (e.g., product/region)", "Revenue", True))
-        qlist.append(mkq("Disclose contract balances rollforward?", "Revenue", True))
-    if "cash" in text_join.lower():
-        qlist.append(mkq("Does cash note reconcile opening to closing?", "Cash", False))
-    if not qlist:
-        qlist.append(mkq("List significant accounting policies disclosed", "Policies", False))
-
+    await send_event(session_id, {"type": "agent.status", "status": "running", "task": "disclosure_review", "agent": "orchestrator"})
+    await run_ingestion_agent(send_event, session_id, tenant_id)
+    ctx = await run_context_agent(send_event, session_id, tenant_id, query=query)
+    qlist = await run_qa_agent(send_event, session_id, ctx.get("rows", []))
     questions_by_session[session_id] = qlist
-    save_questions(session_id, qlist)
-    for q in qlist:
-        await send_event(session_id, {"type": "question.create", "question": q})
-        await asyncio.sleep(0.05)
-    await send_event(session_id, {"type": "agent.status", "status": "paused", "reason": "awaiting_answers"})
 
 
 async def maybe_emit_workflow(session_id: str) -> None:

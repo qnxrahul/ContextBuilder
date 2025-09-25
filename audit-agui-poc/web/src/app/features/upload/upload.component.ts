@@ -11,12 +11,19 @@ import { AguiService } from '../../core/agui.service';
   template: `
     <div>
       <h3>Start Session & Upload Financials</h3>
+      <div>
+        <label>Tenant ID <input [(ngModel)]="tenantId" placeholder="tenant_demo" /></label>
+      </div>
       <button (click)="start()" [disabled]="loading">Start Session</button>
       <div *ngIf="sessionId">Session: {{sessionId}}</div>
       <form *ngIf="sessionId" (submit)="onUpload($event)">
         <input type="file" (change)="onFile($event)" required />
         <button type="submit" [disabled]="!file || loading">Upload</button>
       </form>
+      <div *ngIf="sessionId" style="margin-top:8px;">
+        <label><input type="checkbox" [(ngModel)]="loadDemoEnterprise" /> Load demo enterprise source before running</label>
+        <button (click)="runAgent()" [disabled]="loading">Run Disclosure Review</button>
+      </div>
     </div>
   `,
   styles: ``
@@ -25,6 +32,8 @@ export class UploadComponent {
   loading = false;
   file?: File;
   sessionId: string | null = null;
+  tenantId = '';
+  loadDemoEnterprise = true;
 
   constructor(private agui: AguiService, private router: Router) {}
 
@@ -50,8 +59,24 @@ export class UploadComponent {
     fd.append('sessionId', this.sessionId);
     fd.append('file', this.file);
     await fetch('http://localhost:8000/files', { method: 'POST', body: fd });
-    this.agui.send({ type: 'agent.run', task: 'disclosure_review' });
-    this.router.navigateByUrl('/questions');
+    this.router.navigateByUrl('/knowledge');
     this.loading = false;
+  }
+
+  runAgent() {
+    const tenant = this.tenantId || 'tenant_demo';
+    if (this.loadDemoEnterprise) {
+      this.agui.send({
+        type: 'knowledge.add_source',
+        tenantId: tenant,
+        source: {
+          kind: 'enterprise',
+          title: 'IFRS 15 Revenue Disclosure Checklist (Excerpt)',
+          text: 'Revenue should be disaggregated by category. Contract balances should include rollforwards. Cash note shall reconcile opening to closing cash.'
+        }
+      });
+    }
+    this.agui.send({ type: 'agent.run', task: 'disclosure_review', tenantId: tenant });
+    this.router.navigateByUrl('/questions');
   }
 }

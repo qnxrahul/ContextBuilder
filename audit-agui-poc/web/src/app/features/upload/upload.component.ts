@@ -9,20 +9,30 @@ import { AguiService } from '../../core/agui.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div>
-      <h3>Start Session & Upload Financials</h3>
-      <div>
-        <label>Tenant ID <input [(ngModel)]="tenantId" placeholder="tenant_demo" /></label>
-      </div>
-      <button (click)="start()" [disabled]="loading">Start Session</button>
-      <div *ngIf="sessionId">Session: {{sessionId}}</div>
-      <form *ngIf="sessionId" (submit)="onUpload($event)">
-        <input type="file" (change)="onFile($event)" required />
-        <button type="submit" [disabled]="!file || loading">Upload</button>
-      </form>
-      <div *ngIf="sessionId" style="margin-top:8px;">
-        <label><input type="checkbox" [(ngModel)]="loadDemoEnterprise" /> Load demo enterprise source before running</label>
-        <button (click)="runAgent()" [disabled]="loading">Run Disclosure Review</button>
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="card shadow-sm">
+          <div class="card-header">Start Session & Upload Financials</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Tenant ID</label>
+              <input class="form-control" [(ngModel)]="tenantId" placeholder="tenant_demo" />
+            </div>
+            <button class="btn btn-primary me-2" (click)="start()" [disabled]="loading">Start Session</button>
+            <span *ngIf="sessionId" class="badge text-bg-secondary">Session: {{sessionId}}</span>
+            <form class="mt-3" *ngIf="sessionId" (submit)="onUpload($event)">
+              <input class="form-control" type="file" (change)="onFile($event)" required />
+              <button class="btn btn-outline-primary mt-2" type="submit" [disabled]="!file || loading">Upload</button>
+            </form>
+            <div *ngIf="sessionId" class="mt-3">
+              <div class="form-check">
+                <input class="form-check-input" id="demoBox" type="checkbox" [(ngModel)]="loadDemoEnterprise" />
+                <label class="form-check-label" for="demoBox">Load demo enterprise source before running</label>
+              </div>
+              <button class="btn btn-success mt-2" (click)="runAgent()" [disabled]="loading">Run Disclosure Review</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `,

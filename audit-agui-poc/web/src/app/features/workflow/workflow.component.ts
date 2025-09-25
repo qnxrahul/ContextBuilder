@@ -8,22 +8,44 @@ import { AguiService } from '../../core/agui.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div>
-      <h3>Workflow</h3>
-      <button (click)="refresh()">Refresh</button>
-      <pre *ngIf="workflow">{{workflow | json}}</pre>
-      <div *ngIf="metrics">
-        <h4>Token Usage (estimate)</h4>
-        <div>AG-UI prompt: {{metrics.agui.prompt}} | output: {{metrics.agui.output}}</div>
-        <div>Baseline prompt: {{metrics.baseline.prompt}} | output: {{metrics.baseline.output}}</div>
-        <div>Prompt savings: {{metrics.baseline.prompt - metrics.agui.prompt}}</div>
-      </div>
-      <div *ngIf="widget() as w">
-        <h4>{{w.title}}</h4>
-        <label>
-          Group by: <input [(ngModel)]="w.params.by" />
-        </label>
-        <button (click)="patchWidget(w)">Apply Patch</button>
+    <div class="row">
+      <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3>Workflow</h3>
+          <div>
+            <button class="btn btn-outline-secondary" (click)="refresh()">Refresh</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">
+            <div class="card shadow-sm mb-3" *ngIf="workflow">
+              <div class="card-header">Graph</div>
+              <div class="card-body">
+                <pre class="small mb-0">{{workflow | json}}</pre>
+              </div>
+            </div>
+            <div class="card shadow-sm" *ngIf="metrics">
+              <div class="card-header">Token Usage (estimate)</div>
+              <div class="card-body">
+                <div>AG-UI prompt: {{metrics.agui.prompt}} | output: {{metrics.agui.output}}</div>
+                <div>Baseline prompt: {{metrics.baseline.prompt}} | output: {{metrics.baseline.output}}</div>
+                <div class="text-success">Prompt savings: {{metrics.baseline.prompt - metrics.agui.prompt}}</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6" *ngIf="widget() as w">
+            <div class="card shadow-sm">
+              <div class="card-header">{{w.title}}</div>
+              <div class="card-body">
+                <div class="mb-2">
+                  <label class="form-label">Group by</label>
+                  <input class="form-control" [(ngModel)]="w.params.by" />
+                </div>
+                <button class="btn btn-primary" (click)="patchWidget(w)">Apply Patch</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `,

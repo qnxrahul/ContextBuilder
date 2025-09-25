@@ -1,0 +1,35 @@
+@import "bootstrap/scss/bootstrap";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+// KPMG-inspired theme (blue/white/gray palette)
+$brand-primary: #00338d;
+$brand-secondary: #1a5fb4;
+$brand-accent: #00a3e0;
+$brand-gray-100: #f5f7fa;
+$brand-gray-800: #2e3b4e;
+
+body {
+  background-color: $brand-gray-100;
+  color: $brand-gray-800;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.btn-primary {
+  background-color: $brand-primary;
+  border-color: $brand-primary;
+}
+
+.btn-outline-primary {
+  color: $brand-primary;
+  border-color: $brand-primary;
+}
+
+.card-header {
+  background-color: $brand-primary;
+  color: #fff;
+}
+/* You can add global styles to this file, and also import other style files */

@@ -29,6 +29,8 @@
     "@angular/forms": "^20.3.0",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "adaptivecards": "^3.0.5",
+    "adaptivecards-templating": "^2.3.1",
     "ag-charts-angular": "^12.2.0",
     "ag-charts-community": "^12.2.0",
     "rxjs": "~7.8.0",
